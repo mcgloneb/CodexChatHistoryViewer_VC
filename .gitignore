@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDE/editor
+.vscode/
+.idea/
+
+# ESLint cache
+.eslintcache
+
+# Local data logs (keep sample)
+data/logs/*
+!data/logs/sample.jsonl
