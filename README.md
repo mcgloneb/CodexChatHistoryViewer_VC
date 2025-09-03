@@ -1,4 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Conversation Log Reader Web App (with Directory Listing)
+======================================================
+
+Production-ready Next.js (App Router, TypeScript, Tailwind) app to list local conversation logs and render them as a chat viewer with streaming JSONL parsing, virtualization, and a browser upload fallback.
+
+Quick start
+-----------
+
+- Requirements: Node 18+ (tested on Node 22), pnpm (or npm/yarn)
+- Install: `pnpm install`
+- Set data dir (optional): copy `.env.example` to `.env.local` and adjust `DATA_DIR` (default `./data/logs`)
+- Run: `pnpm dev`
+
+Place logs in `DATA_DIR` (`./data/logs` by default). A sample file is included at `data/logs/sample.jsonl`.
+
+Features
+--------
+
+- FS-backed API for listing directories and streaming files: `GET /api/fs/list` and `GET /api/fs/stream`
+- Secure path resolution; prevents traversal outside the configured `DATA_DIR`
+- Client-side upload fallback when server FS is unavailable (e.g., serverless)
+- Web Worker streaming JSONL parser with batching; JSON array fallback for `.json`
+- Virtualized chat view (tens of thousands of rows) powered by `@tanstack/react-virtual`
+- Toggles: Show tool calls, Show reasoning summaries, Redact PII (emails, tokens, 16+ digit runs)
+
+Acceptance Tests mapping
+------------------------
+
+- AT1: Open `data/logs/sample.jsonl` → user/assistant messages render in order; reasoning content hidden by default.
+- AT2: Toggle “Show tool calls” to reveal `function_call` and `function_call_output` in collapsible blocks. Toggle “Show reasoning summaries” to show summaries only.
+- AT3: Left sidebar lists directories/files. If FS is unavailable, upload area is shown and drag-and-drop works.
+- AT4: JSONL parsing is done in a Web Worker with batched updates; list is virtualized for smooth scrolling on large files.
+- AT5: “Redact PII” masks emails, tokens, and long digit runs; an indicator toggle is present in the viewer header.
+
+Security notes
+--------------
+
+- No external network calls are made at runtime for parsing or listing; files are read locally or via user upload.
+- API routes validate input with Zod and enforce safe paths to prevent traversal.
+- Reasoning content is never rendered; only optional summaries are shown when toggled.
+
+Scripts
+-------
+
+- `pnpm dev` — Run the app locally.
+- `pnpm build` — Production build.
+- `pnpm start` — Start production server.
+- `pnpm test` — Run unit tests (Vitest): normalization, redaction, and path guards.
+
+Notes
+-----
+
+- Large `.jsonl` files are streamed and decoded incrementally in a worker to avoid blocking the main thread.
+- `.json` array files are parsed whole in the worker as a fallback.
+- Redaction uses regex heuristics and may have false positives/negatives.
+
 
 ## Getting Started
 

@@ -1,0 +1,5 @@
+{"ts":"2025-08-20T20:32:00Z","message":{"role":"user","content":["What’s the status?"]}}
+{"ts":"2025-08-20T20:32:05Z","message":{"role":"assistant","content":["We’re rolling out now."]}}
+{"ts":"2025-08-20T20:32:10Z","function_call":{"name":"deploy.start","arguments":{"env":"prod"}}}
+{"ts":"2025-08-20T20:32:15Z","function_call_output":{"name":"deploy.start","output":{"ok":true}}}
+{"ts":"2025-08-20T20:32:20Z","reasoning":{"summary":"Decided to deploy now","content":"<private long chain of thought>"}}
