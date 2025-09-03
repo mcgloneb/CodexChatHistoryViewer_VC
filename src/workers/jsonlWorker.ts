@@ -55,7 +55,7 @@ async function parseStream(stream: ReadableStream<Uint8Array>, total?: number) {
       lineNum++;
       if (!line.trim()) continue;
       try {
-        const rec = JSON.parse(line);
+        const rec = JSON.parse(line.trimEnd());
         const norm = normalizeRecord(rec, lineNum);
         if (norm) enqueue(norm);
       } catch (e: unknown) {
@@ -70,7 +70,7 @@ async function parseStream(stream: ReadableStream<Uint8Array>, total?: number) {
   if (buf.trim()) {
     lineNum++;
     try {
-      const rec = JSON.parse(buf);
+      const rec = JSON.parse(buf.trimEnd());
       const norm = normalizeRecord(rec, lineNum);
       if (norm) enqueue(norm);
     } catch (e: unknown) {

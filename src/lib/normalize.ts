@@ -1,9 +1,11 @@
 export type Role = "user" | "assistant" | "system";
 
+export type Attachment = { kind: "image"; url: string; alt?: string };
+
 export type NormalizedEvent =
-  | { type: "user"; ts: number; text: string }
-  | { type: "assistant"; ts: number; text: string }
-  | { type: "system"; ts: number; text: string }
+  | { type: "user"; ts: number; text: string; attachments?: Attachment[] }
+  | { type: "assistant"; ts: number; text: string; attachments?: Attachment[] }
+  | { type: "system"; ts: number; text: string; attachments?: Attachment[] }
   | { type: "tool_call"; ts: number; name: string; args: unknown }
   | { type: "tool_result"; ts: number; name: string; output: unknown }
   | { type: "meta"; ts: number; kind: "reasoning_summary" | "info"; summary?: string; data?: unknown };
@@ -12,6 +14,30 @@ export type NormalizedEvent =
 export function normalizeRecord(record: unknown, _lineNum: number): NormalizedEvent | undefined {
   const r = (record ?? {}) as Record<string, unknown>;
   const ts = pickTimestamp(record) ?? Date.now();
+
+  // Some logs include top-level markers for state or phases
+  const recType = ((r["record_type"] ?? r["type"]) as string | undefined)?.toLowerCase();
+  if (recType === "state") {
+    return { type: "meta", ts, kind: "info", summary: "state" };
+  }
+
+  // Some logs encode tool calls/results via top-level `type`
+  if (recType === "function_call" || recType === "tool_call") {
+    const name = String((r["name"] as string | undefined) || "");
+    const args = (r["arguments"] ?? r["args"]) as unknown;
+    return { type: "tool_call", ts, name, args };
+  }
+  if (recType === "function_call_output" || recType === "tool_result" || recType === "tool_output") {
+    const name = String((r["name"] as string | undefined) || "");
+    const output = (r["output"] ?? r["result"] ?? r) as unknown;
+    return { type: "tool_result", ts, name, output };
+  }
+  if (recType === "reasoning") {
+    const summary = r["summary"] as unknown;
+    if (typeof summary === "string" && summary.trim()) {
+      return { type: "meta", ts, kind: "reasoning_summary", summary };
+    }
+  }
 
   // Reasoning summary (never include reasoning.content)
   const reasoning = r["reasoning"] as Record<string, unknown> | undefined;
@@ -42,9 +68,12 @@ export function normalizeRecord(record: unknown, _lineNum: number): NormalizedEv
   const message = r["message"] as Record<string, unknown> | undefined;
   const role: Role | undefined = coerceRole((message?.["role"] as unknown) ?? r["role"]);
   if (role) {
-    const content = coerceContent((message?.["content"] as unknown) ?? r["content"]);
-    if (typeof content === "string" && content.length > 0) {
-      return { type: role, ts, text: content } as NormalizedEvent;
+    const parsed = parseContent((message?.["content"] as unknown) ?? r["content"]);
+    const text = parsed.text;
+    if (typeof text === "string" && text.length > 0) {
+      const base: any = { type: role, ts, text };
+      if (parsed.attachments.length) base.attachments = parsed.attachments;
+      return base as NormalizedEvent;
     }
   }
 
@@ -74,12 +103,61 @@ function coerceRole(v: unknown): Role | undefined {
   return undefined;
 }
 
-function coerceContent(v: unknown): string {
-  if (v == null) return "";
-  if (typeof v === "string") return v;
-  if (Array.isArray(v)) return v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join("\n");
-  if (typeof v === "object") return JSON.stringify(v);
-  return String(v);
+function parseContent(v: unknown): { text: string; attachments: Attachment[] } {
+  const attachments: Attachment[] = [];
+  if (v == null) return { text: "", attachments };
+  if (typeof v === "string") return { text: v, attachments };
+  if (Array.isArray(v)) {
+    const parts: string[] = [];
+    for (const item of v) {
+      if (typeof item === "string") {
+        parts.push(item);
+        continue;
+      }
+      if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const type = (obj["type"] as string | undefined)?.toLowerCase();
+        if (type === "input_text" || type === "output_text" || type === "text") {
+          const t = obj["text"];
+          if (typeof t === "string") parts.push(t);
+          else if (typeof obj["content"] === "string") parts.push(obj["content"] as string);
+          else parts.push(JSON.stringify(obj));
+          continue;
+        }
+        if (type?.includes("image")) {
+          const url = sanitizeImageUrl(String(obj["image_url"] || obj["url"] || ""));
+          if (url) attachments.push({ kind: "image", url, alt: typeof obj["alt"] === "string" ? (obj["alt"] as string) : undefined });
+          continue;
+        }
+        // Unknown object, prefer its text/content if present
+        if (typeof obj["text"] === "string") parts.push(obj["text"] as string);
+        else if (typeof obj["content"] === "string") parts.push(obj["content"] as string);
+        else parts.push(JSON.stringify(obj));
+      }
+    }
+    return { text: parts.join("\n\n"), attachments };
+  }
+  if (typeof v === "object") return { text: JSON.stringify(v), attachments };
+  return { text: String(v), attachments };
+}
+
+function sanitizeImageUrl(url: string): string | null {
+  // Allow data: images and blob: URLs; block external http(s) by default per runtime policy
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  if (lower.startsWith("data:image/")) return url;
+  if (lower.startsWith("blob:")) return url;
+  // Allow same-origin absolute URLs as a compromise (optional):
+  try {
+    const u = new URL(url, "http://localhost"); // base ignored for absolute data/blob
+    if (u.protocol === "http:" || u.protocol === "https:") {
+      // Disallow external fetches by default
+      return null;
+    }
+  } catch {
+    // if URL constructor fails, reject
+  }
+  return null;
 }
 
 // Redaction utilities (apply on display)

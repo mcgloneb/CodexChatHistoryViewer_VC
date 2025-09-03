@@ -20,7 +20,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen grid" style={{ gridTemplateColumns: "320px 1fr" }}>
-      <aside className="border-r h-screen overflow-hidden">
+      <aside className="border-r overflow-y-auto">
         <DirectoryPanel
           onOpenFile={(relPath, f) => {
             if (relPath.startsWith("upload:")) {
@@ -35,7 +35,7 @@ export default function Home() {
           }}
         />
       </aside>
-      <main className="h-screen overflow-hidden flex flex-col">
+      <main className="min-h-screen flex flex-col">
         <div className="px-3 py-2 border-b text-sm">Conversation Log Reader</div>
         <div className="flex-1 grid" style={{ gridTemplateRows: "auto 1fr" }}>
           <div className="p-2 text-xs text-gray-600">

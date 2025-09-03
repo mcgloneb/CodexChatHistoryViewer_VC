@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
     }
 
     await fs.promises.access(safePath, fs.constants.R_OK);
+    const stat = await fs.promises.stat(safePath);
 
     const stream = fs.createReadStream(safePath, { encoding: "utf8" });
     const body = new ReadableStream({
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
     return new Response(body, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
+        "Content-Length": String(stat.size),
         "Cache-Control": "no-store",
       },
     });

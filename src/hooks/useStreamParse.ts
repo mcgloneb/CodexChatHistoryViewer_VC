@@ -14,7 +14,7 @@ export function useStreamParse() {
 
   const ensureWorker = useCallback(() => {
     if (workerRef.current) return workerRef.current;
-    const w = new Worker(new URL("../workers/jsonlWorker.ts", import.meta.url));
+    const w = new Worker(new URL("../workers/jsonlWorker.ts", import.meta.url), { type: "module" });
     w.onmessage = (e: MessageEvent) => {
       const msg = e.data;
       if (msg?.type === "batch") {
@@ -30,6 +30,7 @@ export function useStreamParse() {
         setStatus("error");
       }
     };
+    w.onerror = () => setStatus("error");
     workerRef.current = w;
     return w;
   }, []);
@@ -46,7 +47,9 @@ export function useStreamParse() {
     reset();
     setStatus("loading");
     const w = ensureWorker();
-    w.postMessage({ type: "parse-url", url });
+    // Ensure absolute URL for worker context (relative paths fail inside workers)
+    const absolute = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.origin).toString();
+    w.postMessage({ type: "parse-url", url: absolute });
   }, [ensureWorker, reset]);
 
   const startFromFile = useCallback((file: File) => {
@@ -63,4 +66,3 @@ export function useStreamParse() {
 
   return api;
 }
-
