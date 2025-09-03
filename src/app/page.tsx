@@ -33,6 +33,7 @@ export default function Home() {
             setSelected({ kind: "upload", file });
             parser.startFromFile(file);
           }}
+          selectedPath={selected?.kind === "fs" ? selected.relPath : undefined}
         />
       </aside>
       <main className="min-h-screen flex flex-col">
